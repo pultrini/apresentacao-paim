@@ -9,6 +9,7 @@ artigo/            referência e resumo do método original
 python/ctbet_cv/   implementação Python (pacote do projeto uv)
 cpp/               implementação C++ (include/ + src/ + Makefile)
 scripts/compare.sh comparação de tempo e métricas Python × C++
+figuras/           exemplos de figuras de comparação (fantoma)
 ```
 
 ## Método
@@ -61,6 +62,24 @@ scripts/compare.sh -i ct.nii.gz -g manual.nii.gz -n 10
 O script gera `results/timings.jsonl`, `results/metrics.jsonl`, `results/summary.md` e as máscaras. Ele mede o tempo de
 parede do processo e os tempos internos de leitura, segmentação e escrita. Também calcula Dice, Jaccard, sensibilidade,
 especificidade e diferença de volume entre Python e C++ e de cada um contra a referência.
+
+Ele também gera `results/figuras/`:
+
+- `comparacao_fatias.png`: 6 fatias. Cada linha mostra a TC, os contornos das máscaras Python e C++ (amarelo = referência) e
+  o mapa de diferenças (verde = acerto, vermelho = falso positivo, azul = falso negativo).
+- `comparacao_fatias.gif`: o mesmo, percorrendo todas as fatias com cérebro.
+- `tempos.png`: barras com o tempo mediano de cada implementação.
+
+Para gerar as figuras avulsas (qualquer número de máscaras):
+
+```bash
+uv run ctbet-cv visualize ct.nii.gz --mask python=a.nii.gz --mask cpp=b.nii.gz \
+    [--ref manual.nii.gz] [--out pasta] [--slices 8] [--flip-y] [--timings results/timings.jsonl]
+```
+
+Use `--flip-y` se a imagem aparecer de cabeça para baixo (dados em RAS). Gravar GIF exige OpenCV ≥ 4.11.
+
+![comparação](figuras/comparacao_fatias.gif)
 
 Resultado no fantoma (256×256×60, 0,9×0,9×3 mm), numa VM Linux de 2 núcleos:
 

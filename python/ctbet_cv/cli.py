@@ -1,4 +1,4 @@
-"""Linha de comando: ctbet-cv {segment, metrics, phantom, report}.
+"""Linha de comando: ctbet-cv {segment, metrics, phantom, visualize, report}.
 
 Saídas de `segment` e `metrics` são uma linha JSON (mesmo formato do binário C++).
 """
@@ -17,6 +17,7 @@ from .metrics import compute_overlap
 from .nifti import DT_FLOAT32, DT_INT16, DT_UINT8, new_image, read_nifti, write_nifti
 from .phantom import make_phantom
 from .report import build_report
+from .visualize import make_figures
 from .segment import Params, segment_brain
 
 
@@ -82,6 +83,23 @@ def _cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_visualize(args: argparse.Namespace) -> int:
+    ct = read_nifti(args.ct)
+    ref = read_nifti(args.ref).data > 0 if args.ref else None
+    masks = []
+    for item in args.mask:
+        name, sep, path = item.partition("=")
+        if not sep:
+            raise ValueError(f"--mask espera nome=caminho, recebeu {item!r}")
+        masks.append((name, read_nifti(path).data > 0))
+    if not masks:
+        raise ValueError("informe ao menos uma --mask nome=caminho")
+    written = make_figures(ct.data, ct.spacing, masks, ref, args.out, args.slices, args.flip_y, args.timings)
+    for path in written:
+        print(path)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     defaults = Params()
     parser = argparse.ArgumentParser(prog="ctbet-cv", description=__doc__)
@@ -109,6 +127,16 @@ def build_parser() -> argparse.ArgumentParser:
     ph.add_argument("--seed", type=int, default=0)
     ph.set_defaults(func=_cmd_phantom)
 
+    vis = sub.add_parser("visualize", help="gera PNG e GIF comparando máscaras sobre a TC")
+    vis.add_argument("ct", type=Path)
+    vis.add_argument("--mask", action="append", default=[], metavar="NOME=CAMINHO", help="repita para cada máscara")
+    vis.add_argument("--ref", type=Path, help="máscara de referência (opcional)")
+    vis.add_argument("--out", type=Path, default=Path("results/figuras"))
+    vis.add_argument("--slices", type=int, default=6, help="fatias na figura estática")
+    vis.add_argument("--flip-y", action="store_true", help="inverte verticalmente (útil para dados em RAS)")
+    vis.add_argument("--timings", type=Path, help="timings.jsonl do compare.sh, para o gráfico de tempos")
+    vis.set_defaults(func=_cmd_visualize)
+
     rep = sub.add_parser("report", help="resume os resultados de scripts/compare.sh")
     rep.add_argument("timings", type=Path)
     rep.add_argument("metrics", type=Path)
@@ -121,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RuntimeError) as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 1
 

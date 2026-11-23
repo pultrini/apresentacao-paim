@@ -8,7 +8,7 @@
 #   -n  número de repetições por implementação (padrão: 5)
 #   -o  pasta de resultados (padrão: results/)
 #
-# Saídas: <pasta>/timings.jsonl, <pasta>/metrics.jsonl, <pasta>/summary.md e as máscaras.
+# Saídas: <pasta>/timings.jsonl, metrics.jsonl, summary.md, as máscaras e figuras/ (PNG e GIF).
 # Compatível com o bash 3.2 do macOS.
 
 set -euo pipefail
@@ -92,6 +92,11 @@ if [[ -n "$REF" ]]; then
     metric "python_vs_ref" "$OUT/mask_python.nii.gz" "$REF"
     metric "cpp_vs_ref" "$OUT/mask_cpp.nii.gz" "$REF"
 fi
+
+log "gerando figuras (PNG e GIF)"
+vis_args=(--mask "python=$OUT/mask_python.nii.gz" --mask "cpp=$OUT/mask_cpp.nii.gz" --out "$OUT/figuras" --timings "$TIMINGS")
+if [[ -n "$REF" ]]; then vis_args+=(--ref "$REF"); fi
+"$PY" visualize "$INPUT" "${vis_args[@]}" >&2
 
 "$PY" report "$TIMINGS" "$METRICS" --markdown "$OUT/summary.md"
 log "resultados em $OUT"
