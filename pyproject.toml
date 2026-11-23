@@ -1,0 +1,20 @@
+[project]
+name = "ctbet-cv"
+version = "0.1.0"
+description = "Extração de parênquima cerebral em TC (Muschelli et al., 2015) só com OpenCV, sem FSL/FLIRT/BET"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "opencv-python-headless>=4.8",
+    "numpy>=1.24", # já é dependência do OpenCV; declarada porque o código a importa
+]
+
+[project.scripts]
+ctbet-cv = "ctbet_cv.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["python/ctbet_cv"]
