@@ -1,4 +1,4 @@
-"""Linha de comando: ctbet-cv {segment, metrics, phantom, visualize, report}.
+"""Linha de comando: ctbet-cv {segment, metrics, phantom, visualize, evaluate-dataset, report}.
 
 Saídas de `segment` e `metrics` são uma linha JSON (mesmo formato do binário C++).
 """
@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .evaluate import evaluate_dataset
 from .metrics import compute_overlap
 from .nifti import DT_FLOAT32, DT_INT16, DT_UINT8, new_image, read_nifti, write_nifti
 from .phantom import make_phantom
@@ -100,6 +101,20 @@ def _cmd_visualize(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_evaluate(args: argparse.Namespace) -> int:
+    params = Params(
+        lower_hu=args.lower,
+        upper_hu=args.upper,
+        sigma_mm=args.sigma,
+        brain_min_hu=args.brain_min,
+        erosion_mm=args.erosion,
+    )
+    evaluate_dataset(
+        args.data, args.out, args.cpp, params, args.limit, args.figures, args.include_bone, not args.no_flip_y
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     defaults = Params()
     parser = argparse.ArgumentParser(prog="ctbet-cv", description=__doc__)
@@ -136,6 +151,19 @@ def build_parser() -> argparse.ArgumentParser:
     vis.add_argument("--flip-y", action="store_true", help="inverte verticalmente (útil para dados em RAS)")
     vis.add_argument("--timings", type=Path, help="timings.jsonl do compare.sh, para o gráfico de tempos")
     vis.set_defaults(func=_cmd_visualize)
+
+    ev = sub.add_parser("evaluate-dataset", help="avalia no dataset stroke_ct_2019 do artigo (máscaras manuais)")
+    ev.add_argument("data", type=Path, help="pasta com os sujeitos 01..35 extraídos")
+    ev.add_argument("--out", type=Path, default=Path("results/stroke_ct_2019"))
+    ev.add_argument("--cpp", type=Path, help="binário ctbrain_cv para comparar tempo e máscara")
+    ev.add_argument("--limit", type=int, help="avalia só as primeiras N TCs")
+    ev.add_argument("--figures", type=int, default=3, help="casos com figura: pior, mediana, melhor")
+    ev.add_argument("--include-bone", action="store_true", help="inclui a TC com kernel de osso (sujeito 13)")
+    ev.add_argument("--no-flip-y", action="store_true", help="não inverter a imagem nas figuras")
+    for flag, default in (("--lower", defaults.lower_hu), ("--upper", defaults.upper_hu), ("--sigma", defaults.sigma_mm),
+                          ("--brain-min", defaults.brain_min_hu), ("--erosion", defaults.erosion_mm)):
+        ev.add_argument(flag, type=float, default=default)
+    ev.set_defaults(func=_cmd_evaluate)
 
     rep = sub.add_parser("report", help="resume os resultados de scripts/compare.sh")
     rep.add_argument("timings", type=Path)

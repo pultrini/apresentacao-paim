@@ -9,7 +9,8 @@ artigo/            referência e resumo do método original
 python/ctbet_cv/   implementação Python (pacote do projeto uv)
 cpp/               implementação C++ (include/ + src/ + Makefile)
 scripts/compare.sh comparação de tempo e métricas Python × C++
-figuras/           exemplos de figuras de comparação (fantoma)
+scripts/avaliar_stroke_ct.sh  avaliação no dataset real do artigo
+figuras/           figuras de exemplo (fantoma) e resultados reais (figuras/stroke_ct_2019)
 ```
 
 ## Método
@@ -90,6 +91,39 @@ Resultado no fantoma (256×256×60, 0,9×0,9×3 mm), numa VM Linux de 2 núcleos
 
 Python e C++: Dice = 1,000 (máscaras idênticas).
 
-> O fantoma serve para testar o código, não para validar o método. Para comparar com o artigo, rode em TCs reais com
-> máscaras manuais (p. ex. CQ500 ou os exames de exemplo do CT-preprocess). O falso positivo que sobra no fantoma é a
-> medula no canal vertebral, abaixo da base do crânio.
+> O fantoma serve só para testar o código. A validação de verdade está na seção abaixo.
+
+## Avaliação em TC real (dataset do artigo)
+
+O dataset é o **"Non-Contrast Head CT of Stroke Patients with Brain Masks"**, que acompanha o artigo
+([JHU Data Archive, doi:10.7281/T1/CZDPSX](https://archive.data.jhu.edu/dataset.xhtml?persistentId=doi:10.7281/T1/CZDPSX),
+licença CC BY-NC 4.0). São 35 pacientes com hemorragia intracerebral dos ensaios MISTIE/CLEAR, totalizando 37 TCs sem
+contraste. Cada TC tem a máscara manual de dois leitores e a máscara gerada pelo método original (FSL/BET).
+
+```bash
+# baixe 01.tar.xz … 35.tar.xz (≈305 MB) para data/stroke_ct_2019/tarballs/ e rode:
+scripts/avaliar_stroke_ct.sh
+```
+
+O script extrai os dados e roda Python e C++ em todas as TCs. Ele compara cada máscara com os dois leitores e grava
+`metricas_por_tc.csv`, `resumo.md`, o boxplot e as figuras (PNG + GIF) do pior caso, do caso mediano e do melhor caso.
+Os dados não vão para o git (`data/` está no `.gitignore`).
+
+Resultado com os parâmetros padrão, **sem nenhum ajuste nesses dados** (37 TCs; contra o leitor 1, n = 36):
+
+| método | Dice médio ± dp | Dice mediano | Dice mínimo | sensibilidade | especificidade |
+|---|---|---|---|---|---|
+| OpenCV (Python e C++, máscaras idênticas) | 0,975 ± 0,020 | 0,978 | 0,885 | 0,966 | 0,998 |
+| FSL/BET (método do artigo) | 0,981 ± 0,011 | 0,983 | 0,949 | 0,973 | 0,998 |
+| Leitor 2 (concordância entre humanos) | 0,988 ± 0,006 | 0,989 | 0,960 | 0,981 | 0,999 |
+
+Tempo de segmentação por TC (512×512, cerca de 30 a 70 fatias): Python ≈ 0,96 s e C++ ≈ 0,34 s (medianas; o C++ é
+≈ 2,8× mais rápido). As máscaras das duas versões coincidem em 100 % das TCs (Dice = 1,0).
+
+Leitura dos resultados: a versão só com morfologia fica cerca de 0,006 de Dice abaixo do BET na mediana e é mais
+instável nos casos difíceis. O BET foi melhor em 30 das 36 TCs. As falhas ficam na **base do crânio**: nas fatias das
+órbitas e da fossa posterior, a erosão de 4 mm não separa o cérebro das partes moles da face (falso positivo) e, ao
+mesmo tempo, corta pedaços do lobo temporal (falso negativo). O pior caso é o 32 (Dice 0,885).
+
+![boxplot](figuras/stroke_ct_2019/dice_boxplot.png)
+![pior caso](figuras/stroke_ct_2019/pior_32_BRAIN1/comparacao_fatias.gif)
